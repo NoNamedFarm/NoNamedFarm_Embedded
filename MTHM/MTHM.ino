@@ -7,6 +7,8 @@
 #include <Hash.h>
 #include <DHT.h>
 #include <iostream>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
 ESP8266WiFiMulti WiFiMulti;
 SocketIOclient socketIO;
@@ -22,8 +24,12 @@ SocketIOclient socketIO;
 #define SOIL_SENSOR A0
 #define DHTPIN 0
 #define DHTTYPE DHT11
+#define SCL 5
+#define SDA 4
 
 DHT dht(DHTPIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x3F, 16, 2);
+//LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 /*
  * Socket.io Event list
@@ -69,7 +75,12 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
 }
 
 void setup() {
+  pinMode(SCL, OUTPUT);
+  pinMode(SDA, OUTPUT);
   dht.begin();
+  lcd.init();
+  lcd.backlight();
+  
   USE_SERIAL.begin(9600);
   USE_SERIAL.setDebugOutput(true);
 
@@ -142,38 +153,21 @@ void loop() {
     messageTimestamp = Now;
 
     // 소켓io를 위한 Json 메시지(String형) 생성
-    DynamicJsonDocument Temp_doc(1024);
-    DynamicJsonDocument Soil_doc(1024);
-    JsonArray Temp_array = Temp_doc.to<JsonArray>();
-    JsonArray Soil_array = Soil_doc.to<JsonArray>();
+    DynamicJsonDocument doc(1024);
+    JsonArray Array = doc.to<JsonArray>();
 
     // Json에 이벤트 이름 추가
-    Temp_array.add("Temp Data");
-    Soil_array.add("Soil Data");
-
-    // Json 객체에 문자열 추가
-    JsonObject param_t = Temp_array.createNestedObject();
-    param_t["now"] = (uint32_t) (Now / 1000);
-    param_t["data"] = (double) Temp;
-    JsonObject param_s = Soil_array.createNestedObject();
-    param_s["now"] = (uint32_t) (Now / 1000);
-    param_t["data"] = (uint16_t) Soil_Data;
+    Array.add("Soil Data");
 
     // String에 Json 객체가 직렬화되어 저장
-    String Temp_str;
-    String Soil_str;
-    serializeJson(Temp_doc, Temp_str);
-    serializeJson(Soil_doc, Soil_str);
+    String output;
+    serializeJson(doc, output);
 
     // 메시지 전송
-    socketIO.sendEVENT(Temp_str);
-    socketIO.sendEVENT(Soil_str);
+    socketIO.sendEVENT(output);
 
     // Json 메시지 출력
     USE_SERIAL.println("[Socket.IO] Send Message :");
-    USE_SERIAL.print("[Socket.IO] Temperature : ");
-    USE_SERIAL.println(Temp_str);
-    USE_SERIAL.print("[Socket.IO] Humidity : ");
-    USE_SERIAL.println(Soil_str);
+    USE_SERIAL.println(output);
   }
 }
