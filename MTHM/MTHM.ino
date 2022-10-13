@@ -31,14 +31,131 @@ DHT dht(DHTPIN, DHTTYPE);
 LiquidCrystal_I2C lcd(0x3F, 16, 2);
 //LiquidCrystal_I2C lcd(0x27, 16, 2);
 
-/*
- * Socket.io Event list
- * connect : 연결 시작
- * error : 연결 오류
- * disconnect : 연결 중단
- * (추정)event : 통신을 통한 데이터 수신
- * (추정)ACK : 데이터 송신 시 확인용으로 수신
- */
+byte happy[6][8] = {
+  {
+    0b00000,
+    0b00011,
+    0b00100,
+    0b01000,
+    0b01000,
+    0b01000,
+    0b10000,
+    0b10000
+  },
+  {
+    0b11111,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b10001,
+    0b10001,
+    0b10001,
+    0b00000
+  },
+  {
+    0b00000,
+    0b11000,
+    0b00100,
+    0b00010,
+    0b00010,
+    0b00010,
+    0b00001,
+    0b00001
+  },
+  {
+    0b10000,
+    0b10001,
+    0b01001,
+    0b01000,
+    0b01000,
+    0b00100,
+    0b00011,
+    0b00000
+  },
+  {
+    0b00000,
+    0b00000,
+    0b11111,
+    0b11111,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b11111
+  },
+  {
+    0b00001,
+    0b10001,
+    0b10010,
+    0b00010,
+    0b00010,
+    0b00100,
+    0b11000,
+    0b00000
+  }
+};
+
+byte tired[6][8] = {
+  {
+    0b00000,
+    0b00011,
+    0b00100,
+    0b01001,
+    0b01010,
+    0b01000,
+    0b10000,
+    0b10000
+  },
+  {
+    0b11111,
+    0b00000,
+    0b01010,
+    0b10001,
+    0b00000,
+    0b10001,
+    0b10001,
+    0b10001
+  },
+  {
+    0b00000,
+    0b11000,
+    0b00100,
+    0b10010,
+    0b01010,
+    0b00010,
+    0b00001,
+    0b00001
+  },
+  {
+    0b10000,
+    0b10000,
+    0b01000,
+    0b01001,
+    0b01000,
+    0b00100,
+    0b00011,
+    0b00000
+  },
+  {
+    0b00000,
+    0b00000,
+    0b11111,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b00000,
+    0b11111
+  },
+  {
+    0b00001,
+    0b00001,
+    0b00010,
+    0b10010,
+    0b00010,
+    0b00100,
+    0b11000,
+    0b00000
+  }
+};
 
 void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length) {
   switch(type) {
@@ -72,6 +189,26 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t length)
       hexdump(payload, length);
       break;
   }
+}
+
+void setup_Face(bool tf){
+  if(tf == true){
+    for(int i=0; i<6; i++){
+      lcd.createChar(0x00 + i, happy[i]);
+    }
+  }
+  else{
+    for(int i=0; i<6; i++){
+      lcd.createChar(0x00 + i, tired[i]);
+    }
+  }
+}
+
+void print_Face(){
+  lcd.setCursor(6,0);
+  for(int i=0; i<3; i++) lcd.print(0x00 + i);
+  lcd.setCursor(6,1);
+  for(int i=0; i<3; i++) lcd.print(0x03 + i);
 }
 
 void setup() {
@@ -124,6 +261,7 @@ void setup() {
 
 float Temp = 0;
 int Soil_Data = 0;
+bool face = false;
 
 unsigned long messageTimestamp = 0;
 unsigned long sensor_time = 0;
@@ -145,6 +283,23 @@ void loop() {
     if(isnan(Soil_Data)){
       USE_SERIAL.println("Failed to read from Soil_Sensor!");
       return;
+    }
+
+    if((Temp < 30 && Temp > 10) && (Soil_Data < 768 && Soil_Data > 256)){
+      if(face == true) print_Face();
+      else{
+        face = true;
+        setup_Face(face);
+        print_Face();
+      }
+    }
+    else{
+      if(face == false) print_Face();
+      else{
+        face = false;
+        setup_Face(face);
+        print_Face();
+      }
     }
   }
 
