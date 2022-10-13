@@ -23,13 +23,6 @@ SocketIOclient socketIO;
 #define sbi(x) digitalWrite(x, HIGH)
 #define cbi(x) digitalWrite(x, LOW)
 
-//문자열 데이터 파싱을 위한 매크로 정의
-//나중에 변경 필요
-#define From_name 2
-#define To_name 7
-#define From_cmd 10
-#define To_cmd 13
-
 bool Check_Water = false;
 bool Check_Light = false;
 
@@ -45,20 +38,19 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t Length)
       socketIO.send(sIOtype_CONNECT, "/");
       break;
     case sIOtype_EVENT:
+    {
       USE_SERIAL.printf("[Socket.IO] get event: %s\n", payload);
-      String event = std::to_string(payload);
-      String event_name = event.substring(From_name, To_name);
-      if(event_name == "Light"){
-        String event_command = event.substring(From_cmd, Length);
-        if(event_command == "ON") Check_Light = true;
-        else if(event_command == "OFF") Check_Light = false;
+      String cmd = (char*)payload;
+      if(cmd.indexOf("Light") >= 0){
+        if(cmd.indexOf("ON") >= 0) Check_Light = true;
+        else if(cmd.indexOf("OFF") >= 0) Check_Light = false;
       }
-      else if(event_name == "Water"){
-        String event_command = event.substring(From_cmd, Length);
-        if(event_command == "ON") Check_Water = true;
-        else if(event_command == "OFF") Check_Water = false;
+      else if(cmd.indexOf("Water") >= 0){
+        if(cmd.indexOf("ON") >= 0) Check_Water = true;
+        else if(cmd.indexOf("OFF") >= 0) Check_Water = false;
       }
       break;
+    }
     case sIOtype_ACK:
       USE_SERIAL.printf("[Socket.IO] get ack: %u\n", Length);
       hexdump(payload, Length);
@@ -137,8 +129,8 @@ void loop() {
   unsigned long Now = millis();
 
   if(Now - sensor_time > Time){
-    if(Check_Water == true) sbi(M1);  cbi(M2);
-    else if(Check_Water == false) cbi(M1);  cbi(M2);
+    if(Check_Water == true) {sbi(M1);  cbi(M2);}
+    else if(Check_Water == false) {cbi(M1);  cbi(M2);}
 
     if(Check_Light == true) sbi(Relay);
     else if(Check_Light == false) cbi(Relay);
