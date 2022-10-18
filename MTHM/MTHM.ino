@@ -312,7 +312,13 @@ void loop() {
     JsonArray Array = doc.to<JsonArray>();
 
     // Json에 이벤트 이름 추가
+    Array.add("Temp Data");
+    char tmp[10];
+    sprintf(tmp, "%.2f", Temp);
+    Array.add(tmp);
     Array.add("Soil Data");
+    sprintf(tmp, "%2.f", Soil_Data);
+    Array.add(tmp);
 
     // String에 Json 객체가 직렬화되어 저장
     String output;
