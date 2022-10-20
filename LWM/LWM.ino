@@ -9,10 +9,10 @@
 ESP8266WiFiMulti WiFiMulti;
 SocketIOclient socketIO;
 
-#define ssid "user"
-#define pswd "00000000"
-#define addr "10.11.100.100"
-#define port 8880
+#define ssid "2316"
+#define pswd "999999999"
+#define addr "10.156.146.116"
+#define port 8080
 #define URL "/socket.io/?EIO=4"
 
 #define USE_SERIAL Serial
