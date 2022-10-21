@@ -13,7 +13,8 @@ SocketIOclient socketIO;
 #define pswd "999999999"
 #define addr "10.156.146.116"
 #define port 8080
-#define URL "/socket.io/?EIO=4"
+#define url "/socket.io/?EIO=4"
+//#define url "/"
 
 #define USE_SERIAL Serial
 
@@ -30,6 +31,7 @@ void socketIOEvent(socketIOmessageType_t type, uint8_t * payload, size_t Length)
   switch(type) {
     case sIOtype_DISCONNECT:
       USE_SERIAL.printf("[Socket.IO] Disconnected!\n");
+      socketIO.begin(addr, port, url);
       break;
     case sIOtype_CONNECT:
       USE_SERIAL.printf("[Socket.IO] Connected to url: %s\n", payload);
@@ -113,7 +115,7 @@ void setup() {
   USE_SERIAL.printf("[WiFi] Connected, IP : %s\n", ip.c_str());
 
   // 소켓io를 주소, 포트, URL을 통해 연결
-  socketIO.begin(addr, port, URL);
+  socketIO.begin(addr, port, url);
 
   // 이벤트가 발생하면 socketIOEvent() 실행
   socketIO.onEvent(socketIOEvent);
