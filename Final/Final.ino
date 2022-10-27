@@ -4,6 +4,14 @@
 #include <DHT.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
+#include <HardwareSerial.h>
+#include <DFRobotDFPlayerMini.h>
+
+HardwareSerial dfp(2);
+DFRobotDFPlayerMini mp3;
+//임시 정의
+#define DF_tx 22
+#define DF_rx 23
 
 #define DHTPIN 33
 #define DHTTYPE DHT11
@@ -72,6 +80,39 @@ void print_Face(){
   for(int i=0; i<3; i++) lcd.write(0x03 + i);
 }
 
+void WiFi_init(){
+  Serial.println();
+  Serial.println();
+  Serial.print("[WiFi] Connecting to ");
+  Serial.println(ssid);
+
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, pass);
+
+  while(WiFi.status() != WL_CONNECTED){
+    Serial.print(".");
+    delay(100);
+  }
+  Serial.println();
+
+  String ip = WiFi.localIP().toString();
+  Serial.printf("[WiFi] Connected %s\n", ip.c_str());
+}
+
+void DB_init(){
+  Serial.println("[DB] Connecting...");
+  if (conn.connect(server_addr, 3306, user, password)) {
+    delay(1000);
+    Serial.println("[DB] Success to DB!");
+  }
+  else Serial.println("[DB] Connection failed.");
+}
+
+void mp3_init(){
+  dfp.begin(9600, SERIAL_8N1, DF_tx, DF_rx);
+  mp3.begin(dfp);
+}
+
 void setup() {
   dht.begin();
   lcd.init();
@@ -87,31 +128,9 @@ void setup() {
   Serial.begin(115200);
   while (!Serial); // wait for serial port to connect. Needed for Leonardo only
 
-  Serial.println();
-  Serial.println();
-  Serial.print("[WiFi] Connecting to ");
-  Serial.println(ssid);
-
-  // Begin WiFi section
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, pass);
-
-  while(WiFi.status() != WL_CONNECTED){
-    Serial.print(".");
-    delay(100);
-  }
-  Serial.println();
-
-  String ip = WiFi.localIP().toString();
-  Serial.printf("[WiFi] Connected %s\n", ip.c_str());
-  // End WiFi section
-
-  Serial.println("[DB] Connecting...");
-  if (conn.connect(server_addr, 3306, user, password)) {
-    delay(1000);
-    Serial.println("[DB] Success to DB!");
-  }
-  else Serial.println("[DB] Connection failed.");
+  WiFi_init();
+  DB_init();
+  mp3_init();
 }
 
 float Temp = 0;
