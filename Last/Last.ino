@@ -43,6 +43,8 @@ WiFiClient client;
 MySQL_Connection conn((Client *)&client);
 MySQL_Cursor cur = MySQL_Cursor(&conn);
 
+char Device[] = "Proto_Type";
+
 //========================================
 
 byte happy[6][8] = {
@@ -165,7 +167,8 @@ void setup() {
   DB_init();
   mp3_init();
 
-  char SETUP_SQL[] = "INSERT INTO nonamed.farm(temperature,humidity_atm,humidity_soil,is_water,is_light,name,crop,created_date) VALUES(25.00, 0.00, 0, false, false, NULL, NULL, NULL)";
+  char SETUP_SQL[] = "INSERT";
+  sprintf(SETUP_SQL, "INSERT INTO nonamed.farm(id,temperature,humidity_atm,humidity_soil,is_water,is_light,name,crop,created_date,user_id) VALUES(%s, 25.00, 0.00, 0, false, false, NULL, NULL, NULL, NULL)", Device);
   Insert(SETUP_SQL);
 }
 
@@ -185,8 +188,6 @@ unsigned long long actuator_time = 0;
 #define Move_Select 5000
 #define Move_Sensor 500
 #define Move_Actuator 500
-
-char Device[] = "Proto_Type";
 
 void loop() {
   unsigned long long Now = millis();
