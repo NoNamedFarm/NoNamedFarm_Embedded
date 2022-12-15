@@ -4,17 +4,14 @@
 #include <DHT.h>
 #include <Wire.h>
 #include <LiquidCrystal_I2C.h>
-#include <HardwareSerial.h>
-#include <DFRobotDFPlayerMini.h>
 
 //========================================
 
-//MP3 module
-HardwareSerial dfp(2);
-DFRobotDFPlayerMini mp3;
-#define DF_tx 22
-#define DF_rx 23
-#define max_index 13
+//Distance sensor
+#define Dis_sensor 39
+
+//mp3 module
+#define MP3 17
 
 //DHT11
 #define DHTPIN 33
@@ -22,28 +19,31 @@ DFRobotDFPlayerMini mp3;
 DHT dht(DHTPIN, DHTTYPE);
 
 //Soil_sensor
-#define SOIL 14
+#define SOIL 36
 
 //Relays
 #define Motor_Relay 32
 #define LED_Relay 25
 
 //LCD
-LiquidCrystal_I2C lcd(0x3F, 16, 2);
+LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 // wifi & DB
-IPAddress server_addr(192,168,137,186);
-char user[] = "root";
-char password[] = "1234";
+char Domain[] = "pnxelec.iptime.org";
+IPAddress server_addr;
+int port = 1989;
+char user[] = "nonamed";
+char password[] = "Mariadb";
 
-char ssid[] = "CDMA2000";
-char pass[] = "1q2w3e4r";
+char ssid[] = "user";
+char pass[] = "88888888";
 
 WiFiClient client;
 MySQL_Connection conn((Client *)&client);
 MySQL_Cursor cur = MySQL_Cursor(&conn);
 
-char Device[] = "Proto_Type";
+long id = 1;
+char Device[] = "Test_Type";
 
 //========================================
 
@@ -87,18 +87,14 @@ void WiFi_init(){
 }
 
 void DB_init(){
+  WiFi.hostByName(Domain, server_addr);
+
   Serial.println("[DB] Connecting...");
-  if (conn.connect(server_addr, 3306, user, password)) {
+  if (conn.connect(server_addr, port, user, password)) {
     delay(1000);
     Serial.println("[DB] Success to DB!");
   }
   else Serial.println("[DB] Connection failed.");
-}
-
-void mp3_init(){
-  dfp.begin(9600, SERIAL_8N1, DF_rx, DF_tx);
-  mp3.begin(dfp);
-  mp3.volume(25);
 }
 
 void Insert(char* sql){
@@ -107,9 +103,15 @@ void Insert(char* sql){
   }
 }
 
-bool Select(char* sql){
+void Update(char* sql){
+  if(conn.connected()){
+    cur.execute(sql);
+  }
+}
+
+char Select(char* sql){
   row_values *row = NULL;
-  bool Cmd;
+  char *Cmd;
   
   if(conn.connected()){
     cur.execute(sql);
@@ -123,7 +125,7 @@ bool Select(char* sql){
     cur.close();
   }
   
-  return Cmd;
+  return Cmd[0];
 }
 
 void setup_Face(bool face){
@@ -153,8 +155,12 @@ void setup() {
   lcd.init();
   lcd.backlight();
 
+  pinMode(Dis_sensor, INPUT);
+  pinMode(SOIL, INPUT);
+  pinMode(MP3, OUTPUT);
   pinMode(Motor_Relay, OUTPUT);
   pinMode(LED_Relay, OUTPUT);
+  digitalWrite(MP3, HIGH);
   digitalWrite(Motor_Relay, LOW);
   digitalWrite(LED_Relay, LOW);
 
@@ -165,45 +171,55 @@ void setup() {
 
   WiFi_init();
   DB_init();
-  mp3_init();
 
-  char SETUP_SQL[] = "INSERT";
-  sprintf(SETUP_SQL, "INSERT INTO nonamed.farm(id,temperature,humidity_atm,humidity_soil,is_water,is_light,name,crop,created_date,user_id) VALUES(%s, 25.00, 0.00, 0, false, false, NULL, NULL, NULL, NULL)", Device);
+  char SETUP_SQL[175] = "INSERT INTO nonamed.farm(air_humidity, device_id, is_light, is_water, soil_humidity, temperature) VALUE(50, 'Device_001', false, false, 500, 22.0)";
+  sprintf(SETUP_SQL, "INSERT INTO nonamed.farm(air_humidity, device_id, is_light, is_water, soil_humidity, temperature) VALUE(50, '%s', "0", "0", 500, 22.0)", Device);
   Insert(SETUP_SQL);
 }
 
 float Temp = 0;
 float Humi = 0;
 int Soil = 0;
+int Distance = 0;
 
 bool Check_Water = false;
 bool Check_Light = false;
 
-unsigned long long Insert_time = 0;
+unsigned long long Update_time = 0;
 unsigned long long Select_time = 0;
 unsigned long long sensor_time = 0;
 unsigned long long actuator_time = 0;
+unsigned long long sound_time = 0;
 
-#define Move_Insert 5000
-#define Move_Select 5000
-#define Move_Sensor 500
-#define Move_Actuator 500
+//시간 조정 필요
+#define Move_Update 2000
+#define Move_Select 6000
+#define Move_Sensor 1000
+#define Move_Actuator 6000
+#define Move_Speaker 1000
 
 void loop() {
   unsigned long long Now = millis();
 
+  //센서 작동
   if(Now - sensor_time > Move_Sensor){
     sensor_time = Now;
 
+    //온습도 측정
     Temp = dht.readTemperature();
     Humi = dht.readHumidity();
     Soil = analogRead(SOIL);
 
+    //거리 측정
+    Distance = analogRead(Dis_sensor);
+
+    //온습도 측정 불가 시 오류 메시지 출력
     if(isnan(Temp)) Serial.println("[DHT11] Failed to read temp");
     if(isnan(Humi)) Serial.println("[DHT11] Failed to read humi");
     if(isnan(Soil)) Serial.println("[Soil_Sensor] Failed to read");
 
-    if((Temp < 30 && Temp > 10) && (Soil < 768 && Soil > 256)){
+    //LCD 표정 출력
+    if((Temp < 30 && Temp > 10) && (Soil < 3071 && Soil > 1023)){
       setup_Face(true);
       print_Face();
     }
@@ -213,9 +229,11 @@ void loop() {
     }
   }
 
+  //엑추에이터 작동
   if(Now - actuator_time > Move_Actuator){
     actuator_time = Now;
     
+    //등 on/off
     if(Check_Light){
       digitalWrite(LED_Relay, HIGH);
     }
@@ -223,6 +241,7 @@ void loop() {
       digitalWrite(LED_Relay, LOW);
     }
 
+    //물 on/off
     if(Check_Water){
       digitalWrite(Motor_Relay, HIGH);
     }
@@ -231,32 +250,44 @@ void loop() {
     }
   }
 
-  if(Now - Insert_time > Move_Insert){
-    Insert_time = Now;
+  //DB update 작동
+  if(Now - Update_time > Move_Update){
+    Update_time = Now;
 
-    char INSERT_SQL[] = "INSERT";
-    sprintf(INSERT_SQL, "INSERT INTO nonamed.farm(name,temperature,humidity_atm,humidity_soil) VALUES (%s, %.2f, %.2f, %d)", Device, Temp, Humi, Soil);
-  
-    Insert(INSERT_SQL);
+    char UPDATE_SQL[150] = "Update";
+    sprintf(UPDATE_SQL, "UPDATE nonamed.farm SET temperature = %.2f, air_humidity = %.2f, soil_humidity = %d WHERE device_id = \'%s\'", Temp, Humi, Soil, Device);
+    Update(UPDATE_SQL);
   }
 
+  //DB select 작동
   if(Now - Select_time > Move_Select){
     Select_time = Now;
 
-    char SELECT_SQL[] = "SELECT";
-    bool Cmd = false;
+    char SELECT_SQL[150] = "SELECT";
+    char Cmd;
     //--------------------------------------------------------
     //Select Water
-    sprintf(SELECT_SQL, "SELECT is_water FROM nonamed.farm");
+    sprintf(SELECT_SQL, "SELECT is_water FROM nonamed.farm WHERE device_id = '%s'", Device);
     Cmd = Select(SELECT_SQL);
-    if(Cmd == true) Check_Water = true;
-    else if(Cmd == false) Check_Water = false;
+    if(Cmd == '1') Check_Water = true;
+    else if(Cmd == '0') Check_Water = false;
 
     //--------------------------------------------------------
     //Select Light
-    sprintf(SELECT_SQL, "SELECT is_light FROM nonamed.farm");
+    sprintf(SELECT_SQL, "SELECT is_light FROM nonamed.farm WHERE device_id = '%s'", Device);
     Cmd = Select(SELECT_SQL);
-    if(Cmd == true) Check_Light = true;
-    else if(Cmd == false) Check_Light = false;
+    if(Cmd == '1') Check_Light = true;
+    else if(Cmd == '0') Check_Light = false;
+  }
+
+  //칭찬 작동
+  if(Now - sound_time > Move_Speaker){
+    sound_time = Now;
+
+    if(Distance > 100){
+      digitalWrite(MP3, LOW);
+      delay(100);
+      digitalWrite(MP3, HIGH);
+    }
   }
 }
